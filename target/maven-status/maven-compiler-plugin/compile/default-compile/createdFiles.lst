@@ -1,0 +1,9 @@
+ai\GptHelper.class
+Main.class
+analyzer\JavaRiskAnalyzer.class
+analyzer\RiskPattern.class
+analyzer\SecurityIssue.class
+codetoscan\SampleSeleniumTest.class
+codetoscan\SampleVulnerableClass.class
+analyzer\SeleniumRiskAnalyzerCLI.class
+analyzer\SeleniumRiskAnalyzerCLI$RiskPattern.class

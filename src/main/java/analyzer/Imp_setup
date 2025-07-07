@@ -1,0 +1,23 @@
+# Install dependencies
+pip install scikit-learn pandas joblib fastapi uvicorn
+
+# Train model with Vul4J data
+python vul4j_train.py
+
+# Train model from SpotBugs + PMD
+python train_combined.py
+
+# Start FastAPI server
+uvicorn serve_model:app --reload
+
+javac -d out src/analyzer/JavaRiskAnalyzer.java
+
+java -cp out analyzer.JavaRiskAnalyzer codetoscan/SampleVulnerableClass.java
+
+java -cp out analyzer.JavaRiskAnalyzer codetoscan/ otherdir/ file1.java file2.java
+
+java -cp out analyzer.JavaRiskAnalyzer codetoscan/
+
+mvn com.github.spotbugs:spotbugs-maven-plugin:spotbugs
+
+mvn org.apache.maven.plugins:maven-pmd-plugin:pmd

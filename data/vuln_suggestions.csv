@@ -1,0 +1,228 @@
+code_snippet,suggestion
+"public class GptHelper {
+    private static final String API_KEY = System.getenv(""OPENAI_API_KEY"");
+    private static final String ENDPOINT = ""https://api.openai.com/v1/chat/completions"";
+
+    public static String suggestFix(String codeSnippet, String riskType) {
+        OkHttpClient client = new OkHttpClient();
+        Gson gson = new Gson();
+
+        JsonObject body = new JsonObject();
+        body.addProperty(""model"", ""gpt-4o"");
+
+        JsonArray messages = new JsonArray();
+        JsonObject sys = new JsonObject();
+        sys.addProperty(""role"", ""system"");
+        sys.addProperty(""content"", ""You are a secure Java coding assistant."");
+        messages.add(sys);
+
+        JsonObject user = new JsonObject();
+        user.addProperty(""role"", ""user"");
+        user.addProperty(""content"", ""This code has a "" + riskType + "" issue:\n"" + codeSnippet + ""\nFix it securely."");
+        messages.add(user);
+
+        body.add(""messages"", messages);
+
+        Request request = new Request.Builder()
+            .url(ENDPOINT)
+            .post(RequestBody.create(
+                    gson.toJson(body),
+                    MediaType.parse(""application/json"")))
+            .addHeader(""Authorization"", ""Bearer "" + API_KEY)
+            .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) return ""API error: "" + response.code();
+            JsonObject json = JsonParser.parseString(response.body().string()).getAsJsonObject();
+            return json.getAsJsonArray(""choices"")
+                       .get(0).getAsJsonObject()
+                       .getAsJsonObject(""message"")
+                       .get(""content"").getAsString();
+        } catch (Exception e) {
+            return ""GPT API error: "" + e.getMessage();",Add null checks after method calls that can return null.
+"public class GptHelper {
+    private static final String API_KEY = System.getenv(""OPENAI_API_KEY"");
+    private static final String ENDPOINT = ""https://api.openai.com/v1/chat/completions"";
+
+    public static String suggestFix(String codeSnippet, String riskType) {
+        OkHttpClient client = new OkHttpClient();
+        Gson gson = new Gson();
+
+        JsonObject body = new JsonObject();
+        body.addProperty(""model"", ""gpt-4o"");
+
+        JsonArray messages = new JsonArray();
+        JsonObject sys = new JsonObject();
+        sys.addProperty(""role"", ""system"");
+        sys.addProperty(""content"", ""You are a secure Java coding assistant."");
+        messages.add(sys);
+
+        JsonObject user = new JsonObject();
+        user.addProperty(""role"", ""user"");
+        user.addProperty(""content"", ""This code has a "" + riskType + "" issue:\n"" + codeSnippet + ""\nFix it securely."");
+        messages.add(user);
+
+        body.add(""messages"", messages);
+
+        Request request = new Request.Builder()
+            .url(ENDPOINT)
+            .post(RequestBody.create(
+                    gson.toJson(body),
+                    MediaType.parse(""application/json"")))
+            .addHeader(""Authorization"", ""Bearer "" + API_KEY)
+            .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) return ""API error: "" + response.code();
+            JsonObject json = JsonParser.parseString(response.body().string()).getAsJsonObject();
+            return json.getAsJsonArray(""choices"")
+                       .get(0).getAsJsonObject()
+                       .getAsJsonObject(""message"")
+                       .get(""content"").getAsString();
+        } catch (Exception e) {
+            return ""GPT API error: "" + e.getMessage();",Avoid catching generic Exception. Catch specific exceptions or rethrow after handling.
+"public RiskPattern(String name, String regex, String suggestion) {
+        this.name = name;
+        this.pattern = Pattern.compile(regex);
+        this.suggestion = suggestion;
+    }",Remove unused public/protected fields or make them private.
+"public RiskPattern(String name, String regex, String suggestion) {
+        this.name = name;
+        this.pattern = Pattern.compile(regex);
+        this.suggestion = suggestion;
+    }",Remove unused public/protected fields or make them private.
+"public RiskPattern(String name, String regex, String suggestion) {
+        this.name = name;
+        this.pattern = Pattern.compile(regex);
+        this.suggestion = suggestion;
+    }",Remove unused public/protected fields or make them private.
+"public SecurityIssue(String type, int line, String code, String suggestion) {
+        this.type = type;
+        this.line = line;
+        this.code = code;
+        this.suggestion = suggestion;
+    }
+
+    public String getType() { return type; }
+    public String getCode() { return code; }
+
+    @Override
+    public String toString() {
+        return String.format(""[%s] at line %d: %s\n  ➤ Suggestion: %s"", type, line, code, suggestion);",Avoid using platform-dependent newline characters in format strings. Use %n instead of \n.
+"public class SampleSeleniumTest {
+
+    public static void main(String[] args) {
+        System.setProperty(""webdriver.chrome.driver"", ""path/to/chromedriver"");
+
+        WebDriver driver = new ChromeDriver();
+        try {
+            driver.get(""https://example.com/login"");
+
+            // Hardcoded username and password (risky)
+            String username = ""admin"";
+            String password = ""password123"";
+
+            driver.findElement(By.id(""username123"")).sendKeys(username);  // brittle locator (digits in id)
+            driver.findElement(By.id(""password"")).sendKeys(password);
+
+            Thread.sleep(5000);  // bad: explicit sleep (flaky test risk)
+
+            driver.findElement(By.id(""loginButton"")).click();
+
+        } catch (Exception e) {
+            // empty catch block (bad practice)
+        } finally {
+            driver.quit();
+        }
+    }",Avoid catching generic Exception. Catch specific exceptions or rethrow after handling.
+"public class SampleVulnerableClass {
+    public void login(String username, String password) throws Exception {
+        String adminPassword = ""secret123""; // Hardcoded password
+        Connection conn = DriverManager.getConnection(""jdbc:mysql://localhost:3306/test"", ""user"", ""pass"");
+        Statement stmt = conn.createStatement();
+        String query = ""SELECT * FROM users WHERE username = '"" + username + ""' AND password = '"" + password + ""'"";
+        stmt.executeQuery(query);
+    }
+
+    public void generateToken() {
+        Random rand = new Random(); // Insecure random
+        System.out.println(""Token: "" + rand.nextInt());
+    }",Avoid using hardcoded database passwords. Use environment variables or secure config files.
+"public class SampleVulnerableClass {
+    public void login(String username, String password) throws Exception {
+        String adminPassword = ""secret123""; // Hardcoded password
+        Connection conn = DriverManager.getConnection(""jdbc:mysql://localhost:3306/test"", ""user"", ""pass"");
+        Statement stmt = conn.createStatement();
+        String query = ""SELECT * FROM users WHERE username = '"" + username + ""' AND password = '"" + password + ""'"";
+        stmt.executeQuery(query);
+    }
+
+    public void generateToken() {
+        Random rand = new Random(); // Insecure random
+        System.out.println(""Token: "" + rand.nextInt());
+    }","Ensure that all opened resources (files, streams, DB) are properly closed using try-with-resources."
+"public class SampleVulnerableClass {
+    public void login(String username, String password) throws Exception {
+        String adminPassword = ""secret123""; // Hardcoded password
+        Connection conn = DriverManager.getConnection(""jdbc:mysql://localhost:3306/test"", ""user"", ""pass"");
+        Statement stmt = conn.createStatement();
+        String query = ""SELECT * FROM users WHERE username = '"" + username + ""' AND password = '"" + password + ""'"";
+        stmt.executeQuery(query);
+    }
+
+    public void generateToken() {
+        Random rand = new Random(); // Insecure random
+        System.out.println(""Token: "" + rand.nextInt());
+    }","Ensure that all opened resources (files, streams, DB) are properly closed using try-with-resources."
+"public class SampleVulnerableClass {
+    public void login(String username, String password) throws Exception {
+        String adminPassword = ""secret123""; // Hardcoded password
+        Connection conn = DriverManager.getConnection(""jdbc:mysql://localhost:3306/test"", ""user"", ""pass"");
+        Statement stmt = conn.createStatement();
+        String query = ""SELECT * FROM users WHERE username = '"" + username + ""' AND password = '"" + password + ""'"";
+        stmt.executeQuery(query);
+    }
+
+    public void generateToken() {
+        Random rand = new Random(); // Insecure random
+        System.out.println(""Token: "" + rand.nextInt());
+    }","Close database resources like ResultSet, Statement, and Connection properly in a finally block or try-with-resources."
+"public class SampleVulnerableClass {
+    public void login(String username, String password) throws Exception {
+        String adminPassword = ""secret123""; // Hardcoded password
+        Connection conn = DriverManager.getConnection(""jdbc:mysql://localhost:3306/test"", ""user"", ""pass"");
+        Statement stmt = conn.createStatement();
+        String query = ""SELECT * FROM users WHERE username = '"" + username + ""' AND password = '"" + password + ""'"";
+        stmt.executeQuery(query);
+    }
+
+    public void generateToken() {
+        Random rand = new Random(); // Insecure random
+        System.out.println(""Token: "" + rand.nextInt());
+    }","Close database resources like ResultSet, Statement, and Connection properly in a finally block or try-with-resources."
+"public class SampleVulnerableClass {
+    public void login(String username, String password) throws Exception {
+        String adminPassword = ""secret123""; // Hardcoded password
+        Connection conn = DriverManager.getConnection(""jdbc:mysql://localhost:3306/test"", ""user"", ""pass"");
+        Statement stmt = conn.createStatement();
+        String query = ""SELECT * FROM users WHERE username = '"" + username + ""' AND password = '"" + password + ""'"";
+        stmt.executeQuery(query);
+    }
+
+    public void generateToken() {
+        Random rand = new Random(); // Insecure random
+        System.out.println(""Token: "" + rand.nextInt());
+    }",Always use the return value of methods. Ignoring it may cause logic issues.
+"public class SampleVulnerableClass {
+    public void login(String username, String password) throws Exception {
+        String adminPassword = ""secret123""; // Hardcoded password
+        Connection conn = DriverManager.getConnection(""jdbc:mysql://localhost:3306/test"", ""user"", ""pass"");
+        Statement stmt = conn.createStatement();
+        String query = ""SELECT * FROM users WHERE username = '"" + username + ""' AND password = '"" + password + ""'"";
+        stmt.executeQuery(query);
+    }
+
+    public void generateToken() {
+        Random rand = new Random(); // Insecure random
+        System.out.println(""Token: "" + rand.nextInt());
+    }",Avoid SQL injection by using PreparedStatements instead of string concatenation in SQL.
