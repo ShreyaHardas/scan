@@ -1,11 +1,115 @@
+import xml.etree.ElementTree as ET
+import pandas as pd
+import numpy as np
 from gensim.corpora import Dictionary
 from gensim.models import TfidfModel
-import xgboost as xgb
 import cloudpickle
+from pathlib import Path
 
+# ------------ 🧠 TOKENIZER ------------
 def tokenize(text):
-    return text.lower().split()  # Very basic tokenizer; replace with better if needed
+    return text.lower().split()
 
+# ------------ 🤖 SIMPLE LOGISTIC REGRESSION ------------
+class SimpleLogisticRegression:
+    def __init__(self, learning_rate=0.1, n_iter=1000):
+        self.learning_rate = learning_rate
+        self.n_iter = n_iter
+
+    def _sigmoid(self, z):
+        return 1 / (1 + np.exp(-z))
+
+    def fit(self, X, y):
+        self.classes_ = np.unique(y)
+        self.weights = np.zeros((len(self.classes_), X.shape[1]))
+        self.bias = np.zeros(len(self.classes_))
+
+        for class_index, class_label in enumerate(self.classes_):
+            y_binary = (y == class_label).astype(float)
+            for _ in range(self.n_iter):
+                linear_output = np.dot(X, self.weights[class_index]) + self.bias[class_index]
+                y_pred = self._sigmoid(linear_output)
+                error = y_pred - y_binary
+
+                self.weights[class_index] -= self.learning_rate * np.dot(error, X) / X.shape[0]
+                self.bias[class_index] -= self.learning_rate * np.mean(error)
+
+    def predict(self, X):
+        logits = np.dot(X, self.weights.T) + self.bias
+        probs = self._sigmoid(logits)
+        return self.classes_[np.argmax(probs, axis=1)]
+
+# ------------ 🔎 PMD PARSER ------------
+def parse_pmd(xml_file):
+    tree = ET.parse(xml_file)
+    root = tree.getroot()
+    data = []
+    rules = set()
+
+    for file in root.findall('file'):
+        for violation in file.findall('violation'):
+            rule = violation.get('rule')
+            if rule:
+                rules.add(rule)
+
+    print("📘 PMD Rules Found:")
+    for rule in sorted(rules):
+        print("-", rule)
+
+    for file in root.findall('file'):
+        for violation in file.findall('violation'):
+            rule = violation.get('rule')
+            msg = violation.text.strip() if violation.text else ""
+            suggestion = get_pmd_suggestion(rule)
+            data.append({"tool": "PMD", "message": msg, "rule": rule, "suggestion": suggestion})
+
+    return pd.DataFrame(data)
+
+def get_pmd_suggestion(rule):
+    fixes = {
+        "AvoidPrintStackTrace": "Use a logger instead of printStackTrace().",
+        "UnusedLocalVariable": "Remove unused local variables.",
+        "EmptyCatchBlock": "Log or handle the exception inside the catch block."
+    }
+    return fixes.get(rule, "No suggestion available.")
+
+# ------------ 🔍 SPOTBUGS PARSER ------------
+def parse_spotbugs(xml_file):
+    tree = ET.parse(xml_file)
+    root = tree.getroot()
+    data = []
+    bug_types = set()
+
+    for bug_instance in root.findall("BugInstance"):
+        bug_type = bug_instance.get("type")
+        if bug_type:
+            bug_types.add(bug_type)
+        msg = bug_instance.findtext("LongMessage") or bug_instance.findtext("ShortMessage")
+        msg = msg.strip() if msg else ""
+        suggestion = get_spotbugs_suggestion(bug_type)
+        data.append({"tool": "SpotBugs", "message": msg, "rule": bug_type, "suggestion": suggestion})
+
+    print("🐞 SpotBugs Bug Types Found:")
+    for bug in sorted(bug_types):
+        print("-", bug)
+
+    return pd.DataFrame(data)
+
+def get_spotbugs_suggestion(bug_type):
+    fixes = {
+        "DMI_CONSTANT_DB_PASSWORD": "Avoid using hardcoded database passwords.",
+        "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE": "Add null checks after method calls that can return null.",
+        "OBL_UNSATISFIED_OBLIGATION": "Ensure all opened resources are properly closed.",
+        "ODR_OPEN_DATABASE_RESOURCE": "Close DB resources properly.",
+        "REC_CATCH_EXCEPTION": "Avoid catching generic Exception.",
+        "RV_RETURN_VALUE_IGNORED": "Always use the return value of methods.",
+        "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE": "Use PreparedStatements to prevent SQL injection.",
+        "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD": "Remove or privatize unused fields.",
+        "VA_FORMAT_STRING_USES_NEWLINE": "Use %n instead of \n in format strings."
+    }
+    return fixes.get(bug_type, "No suggestion available.")
+
+# ------------ 🧠 TRAINING ------------
 def train_combined_model(df):
     tokenized = df["message"].apply(tokenize)
     dictionary = Dictionary(tokenized)
@@ -14,26 +118,38 @@ def train_combined_model(df):
     tfidf_model = TfidfModel(corpus)
     tfidf_corpus = [tfidf_model[doc] for doc in corpus]
 
-    # Convert TF-IDF vectors to dense format (required by XGBoost)
     num_features = len(dictionary)
-    X_dense = []
-    for doc in tfidf_corpus:
-        vec = [0.0] * num_features
-        for idx, value in doc:
-            vec[idx] = value
-        X_dense.append(vec)
+    X = np.zeros((len(tfidf_corpus), num_features))
+    for i, doc in enumerate(tfidf_corpus):
+        for idx, val in doc:
+            X[i, idx] = val
 
-    y = df["suggestion"].astype("category").cat.codes
-    label_mapping = dict(enumerate(df["suggestion"].astype("category").cat.categories))
+    y_labels, y = np.unique(df["suggestion"], return_inverse=True)
 
-    model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='mlogloss')
-    model.fit(X_dense, y)
+    model = SimpleLogisticRegression()
+    model.fit(X, y)
 
     with open("combined_model.pkl", "wb") as f:
         cloudpickle.dump(model, f)
 
     with open("combined_vectorizer.pkl", "wb") as f:
-        cloudpickle.dump((dictionary, tfidf_model, label_mapping), f)
+        cloudpickle.dump((dictionary, tfidf_model, y_labels), f)
 
     print("✅ Model and vectorizer saved with cloudpickle.")
-    return model, (dictionary, tfidf_model, label_mapping)
+    return model, (dictionary, tfidf_model, y_labels)
+
+# ------------ 🚀 MAIN ------------
+def main():
+    print("📦 Loading and merging PMD + SpotBugs data...")
+    pmd_path = Path("target") / "pmd.xml"
+    spotbugs_path = Path("target") / "spotbugsXml.xml"
+
+    df_pmd = parse_pmd(pmd_path)
+    df_spot = parse_spotbugs(spotbugs_path)
+    combined_df = pd.concat([df_pmd, df_spot], ignore_index=True)
+    print(f"🔍 Loaded {len(combined_df)} combined samples.")
+
+    train_combined_model(combined_df)
+
+if __name__ == "__main__":
+    main()
