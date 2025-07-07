@@ -1,0 +1,39 @@
+from gensim.corpora import Dictionary
+from gensim.models import TfidfModel
+import xgboost as xgb
+import cloudpickle
+
+def tokenize(text):
+    return text.lower().split()  # Very basic tokenizer; replace with better if needed
+
+def train_combined_model(df):
+    tokenized = df["message"].apply(tokenize)
+    dictionary = Dictionary(tokenized)
+    corpus = [dictionary.doc2bow(doc) for doc in tokenized]
+
+    tfidf_model = TfidfModel(corpus)
+    tfidf_corpus = [tfidf_model[doc] for doc in corpus]
+
+    # Convert TF-IDF vectors to dense format (required by XGBoost)
+    num_features = len(dictionary)
+    X_dense = []
+    for doc in tfidf_corpus:
+        vec = [0.0] * num_features
+        for idx, value in doc:
+            vec[idx] = value
+        X_dense.append(vec)
+
+    y = df["suggestion"].astype("category").cat.codes
+    label_mapping = dict(enumerate(df["suggestion"].astype("category").cat.categories))
+
+    model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='mlogloss')
+    model.fit(X_dense, y)
+
+    with open("combined_model.pkl", "wb") as f:
+        cloudpickle.dump(model, f)
+
+    with open("combined_vectorizer.pkl", "wb") as f:
+        cloudpickle.dump((dictionary, tfidf_model, label_mapping), f)
+
+    print("✅ Model and vectorizer saved with cloudpickle.")
+    return model, (dictionary, tfidf_model, label_mapping)
